@@ -1,6 +1,6 @@
-use chrono::{Utc, NaiveDateTime};
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, Pool, Postgres};
+use sqlx::FromRow;
 
 #[derive(Serialize, Deserialize, Clone, FromRow)]
 pub struct Thumb {
@@ -8,7 +8,7 @@ pub struct Thumb {
     title: String,
     author_name: String,
     author_img: String,
-    time:NaiveDateTime,
+    time: NaiveDateTime,
     views: i32,
     active: bool,
 }
