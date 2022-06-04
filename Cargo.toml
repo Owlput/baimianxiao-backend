@@ -27,3 +27,4 @@ sqlx = { version = "*", features = [
     "chrono",
 ] }
 rand = "*"
+xxhash-rust = {version = "0.8.5", features=["xxh64"]}

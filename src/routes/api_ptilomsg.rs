@@ -21,7 +21,6 @@ pub async fn api_ptilomsg(
     Extension(hyper_client): Extension<hyper::Client<HttpsConnector<HttpConnector>>>,
     Form(input): Form<Input>,
 ) {
-    // info!("request from user:{:?}", input); //for debug purpose
     match hyper_client
         .request(
             Request::builder()
@@ -40,10 +39,10 @@ pub async fn api_ptilomsg(
         Ok(response) => {
             let response_content_length = match response.body().size_hint().upper() {
                 Some(v) => v,
-                None => 512,
+                None => 256,
             };
 
-            if response_content_length < 513 {
+            if response_content_length < 257 {
                 info!(
                     "verified token with response:{:?}",
                     String::from_utf8(

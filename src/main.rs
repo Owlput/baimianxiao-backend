@@ -3,6 +3,7 @@ pub mod access_code;
 mod db;
 mod routes;
 pub mod macros;
+pub mod hcaptcha;
 
 use hyper_tls::HttpsConnector;
 use routes::construct_router;
