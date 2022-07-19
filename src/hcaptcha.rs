@@ -4,7 +4,7 @@ use axum::body::HttpBody;
 use hyper::{client::HttpConnector, Body, Method, Request};
 use hyper_tls::HttpsConnector;
 use serde::Deserialize;
-use tracing::{error, info};
+use tracing::{info, warn};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -13,18 +13,19 @@ pub struct HcaptchaResponse {
     pub challenge_ts: String,
     hostname: String,
     credit: Option<bool>,
-    #[serde(alias = r#"error-codes"#)]
+    #[serde(alias = "error-codes")]
     error_codes: Option<Vec<String>>,
     score: Option<f64>,
-    #[serde(alias = r#"score-reason"#)]
+    #[serde(alias = "score-reason")]
     score_reason: Option<Vec<String>>,
 }
 
-async fn verify_hcaptcha<T>(
+pub async fn verify_hcaptcha(
     hyper_client: hyper::Client<HttpsConnector<HttpConnector>>,
     token: &String,
 ) -> Result<(), ()> {
-    let token_hash = xxhash_rust::xxh64::xxh64(token.as_bytes(), 2048);
+    let token_hash = xxhash_rust::xxh64::xxh64(token.as_bytes(), 255);
+    info!("token received with hash: {}",token_hash);
     match hyper_client
         .request(
             Request::builder()
@@ -41,29 +42,36 @@ async fn verify_hcaptcha<T>(
         .await
     {
         Ok(res) => {
-            if res.body().size_hint().upper().unwrap_or(512) < 513 {
-                let res_msg: HcaptchaResponse = match serde_json::from_slice::<HcaptchaResponse>(
+            if res.body().size_hint().upper().unwrap_or(254) < 255 {
+                match serde_json::from_slice::<HcaptchaResponse>(
                     &match hyper::body::to_bytes(res.into_body()).await {
                         Ok(b) => b,
-                        Err(_) => todo!(),
+                        Err(e) => {
+                            warn!("Failed to parse verification response body for {} with {}",token_hash,e);
+                            return Err(())
+                        },
                     },
                 ) {
-                    Ok(_) => todo!(),
-                    Err(_) => todo!(),
+                    Ok(val) => {
+                        if val.success {
+                            return Ok(())
+                        } else {
+                            info!("Failed to verify {}",token_hash);
+                            return Err(())
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Failed to parse response from hCaptcha server for {} with {}",token_hash,e);
+                        return Err(())
+                    },
                 };
-
-                if res_msg.success {
-                    info!("token {} verified with response:{:?}", token_hash, res_msg);
-                    Ok(())
-                } else{
-                    Err(())
-                }
             } else {
+                warn!("Failed to verify {}: Response from hCaptcha server is longer than expected.",token_hash);
                 Err(())
             }
         }
         Err(e) => {
-            error!("Failed to verify hCaptcha: {} with error:{}", token_hash, e);
+            warn!("Failed to verify token: {} with error:{}", token_hash, e);
             Err(())
         }
     }

@@ -1,8 +1,9 @@
-pub mod api_ptilomsg;
+pub mod ptilopsis;
+
 
 use std::sync::{atomic::AtomicU64, Arc};
 
-use api_ptilomsg::api_ptilomsg;
+use ptilopsis::api::ptilomsg::ptilomsg;
 use axum::{
     http::{HeaderValue, Method},
     routing::*,
@@ -10,23 +11,28 @@ use axum::{
 };
 use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
+use redis::aio::ConnectionManager;
 use sqlx::{Pool, Postgres};
 use tower_http::cors::CorsLayer;
 
-use crate::{db::schemas::Thumb, simple_get_route};
+use crate::{db::schemas::ThumbData, simple_get_route, routes::ptilopsis::api::baimianxiao::get_artwork};
+use crate::routes::ptilopsis::*;
 
 pub fn construct_router(
-    pool: &Pool<Postgres>,
+    pg_pool_read: &Pool<Postgres>,
     code: Arc<AtomicU64>,
     hyper_client: hyper::Client<HttpsConnector<HttpConnector>>,
+    redis_client: ConnectionManager,
 ) -> Router {
-    simple_get_route!(api_baimianxiao_thumbs, "SELECT * FROM thumb_data;", Thumb);
+    simple_get_route!(api_baimianxiao_thumbs, r#"SELECT * FROM "thumbData";"#, ThumbData);
     Router::new()
-        .route("/api/baimianxiao/thumbs", get(api_baimianxiao_thumbs))
-        .route("/api/ptilomsg", post(api_ptilomsg))
-        .layer(Extension(pool.clone()))
+        .route("/api/baimianxiao/thumbData/all", get(api_baimianxiao_thumbs))
+        .route("/api/ptilomsg", post(ptilomsg))
+        .route("/api/baimianxiao/artwork/:id", get(api::baimianxiao::get_artwork))
+        .layer(Extension(pg_pool_read.clone()))
         .layer(Extension(code))
         .layer(Extension(hyper_client))
+        .layer(Extension(redis_client))
         .layer(
             CorsLayer::new()
                 .allow_origin("http://127.0.0.1:3000".parse::<HeaderValue>().unwrap())

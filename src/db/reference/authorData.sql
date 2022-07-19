@@ -1,5 +1,5 @@
 CREATE TABLE "authorData"(
-    "id" VARCHAR(16) PRIMARY KEY NOT NULL,
+    "id" VARCHAR(8) PRIMARY KEY NOT NULL,
     "name" VARCHAR(50) NOT NULL,
     "contact" text [] [2],
     "recent" text []

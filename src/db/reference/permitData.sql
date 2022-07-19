@@ -1,10 +1,10 @@
-CREATE TABLE "permits"(
-    "id" VARCHAR NOT NULL PRIMARY KEY,
+CREATE TABLE "permitData"(
+    "id" VARCHAR(8) NOT NULL PRIMARY KEY,
     "source" text [] NOT NULL
 );
 
 INSERT INTO
-    "permits"("id", "source")
+    "permitData"("id", "source")
 VALUES
 (
         'testPermitId',

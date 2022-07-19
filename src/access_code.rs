@@ -8,7 +8,7 @@ pub fn setup_code(code: Arc<AtomicU64>) {
             let val = rand::random::<u64>();
             code.store(val, std::sync::atomic::Ordering::SeqCst);
             info!("successfully generated access code:{}", val);
-            tokio::time::sleep(Duration::from_secs(720)).await;
+            tokio::time::sleep(Duration::from_secs(120)).await;
         }
     });
 }

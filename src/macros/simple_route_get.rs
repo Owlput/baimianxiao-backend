@@ -14,12 +14,12 @@ macro_rules! simple_get_route {
                     Ok(json)
                 }
                 Err(e) => {
-                    tracing::error!("{}", e);
+                    tracing::error!("failed to serve route {} with error {}",stringify!($route), e);
                     Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
                 }
             },
             Err(e) => {
-                tracing::error!("{}", e);
+                tracing::error!("failed to serve route {} with error {}",stringify!($route), e);
                 Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))
             }
         }
