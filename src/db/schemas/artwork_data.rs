@@ -2,24 +2,6 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
-#[derive(Deserialize, Serialize, PartialEq, Debug)]
-#[serde(rename = "license")]
-pub enum License {
-    Custom,
-    CCBYNCND4,
-    CC0,
-    Unrecognized,
-}
-impl From<String> for License {
-    fn from(val: String) -> Self {
-        match val.as_str() {
-            "Custom" => Self::Custom,
-            "CCBYNCND4" => Self::CCBYNCND4,
-            "CC0" => Self::CC0,
-            _ => Self::Unrecognized,
-        }
-    }
-}
 #[derive(Serialize, Deserialize, PartialEq, Debug, FromRow)]
 #[serde(rename_all = "camelCase")]
 #[sqlx(rename_all = "camelCase")]
@@ -28,12 +10,12 @@ pub struct ArtworkData {
     title: String,
     author_id: String,
     permit_id: String,
-    tags: Vec<(String, u64)>,
+    tags: Vec<(String, i64)>,
     source_other: Vec<(String, String)>,
-    license: License,
+    license: String,
     time_origin: NaiveDateTime,
     time_this: NaiveDateTime,
-    views: u64,
+    views: i64,
     active: bool,
 }
 impl TryFrom<String> for ArtworkData {
@@ -59,7 +41,7 @@ mod test {
             permit_id: "testPermitId".into(),
             tags: vec![("tag1".into(), 123), ("tag2".into(), 456)],
             source_other: vec![("plat1".into(), "example.com".into())],
-            license: License::CC0,
+            license: "CC0".to_string(),
             time_origin: NaiveDateTime::parse_from_str("2015-09-05 23:56:04", "%Y-%m-%d %H:%M:%S")
                 .unwrap(),
             time_this: NaiveDateTime::parse_from_str("2015-09-05 23:56:04", "%Y-%m-%d %H:%M:%S")

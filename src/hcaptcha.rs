@@ -10,8 +10,8 @@ use tracing::{info, warn};
 #[derive(Deserialize, Debug)]
 pub struct HcaptchaResponse {
     pub success: bool,
-    pub challenge_ts: String,
-    hostname: String,
+    pub challenge_ts: Option<String>,
+    hostname: Option<String>,
     credit: Option<bool>,
     #[serde(alias = "error-codes")]
     error_codes: Option<Vec<String>>,
@@ -42,7 +42,7 @@ pub async fn verify_hcaptcha(
         .await
     {
         Ok(res) => {
-            if res.body().size_hint().upper().unwrap_or(254) < 255 {
+            if res.body().size_hint().upper().unwrap_or(513) < 512 {
                 match serde_json::from_slice::<HcaptchaResponse>(
                     &match hyper::body::to_bytes(res.into_body()).await {
                         Ok(b) => b,

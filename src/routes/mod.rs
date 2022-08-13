@@ -13,16 +13,16 @@ use hyper::client::HttpConnector;
 use hyper_tls::HttpsConnector;
 use redis::aio::ConnectionManager;
 use sqlx::{Pool, Postgres};
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer,Any};
 
 use crate::{db::schemas::ThumbData, simple_get_route, routes::ptilopsis::api::baimianxiao::get_artwork};
 use crate::routes::ptilopsis::*;
 
 pub fn construct_router(
-    pg_pool_read: &Pool<Postgres>,
+    pg_pool_read: &Option<Pool<Postgres>>,
     code: Arc<AtomicU64>,
     hyper_client: hyper::Client<HttpsConnector<HttpConnector>>,
-    redis_client: ConnectionManager,
+    redis_client: &Option<ConnectionManager>,
 ) -> Router {
     simple_get_route!(api_baimianxiao_thumbs, r#"SELECT * FROM "thumbData";"#, ThumbData);
     Router::new()
@@ -32,11 +32,13 @@ pub fn construct_router(
         .layer(Extension(pg_pool_read.clone()))
         .layer(Extension(code))
         .layer(Extension(hyper_client))
-        .layer(Extension(redis_client))
+        .layer(Extension(redis_client.clone()))
         .layer(
             CorsLayer::new()
                 .allow_origin("http://127.0.0.1:3000".parse::<HeaderValue>().unwrap())
-                .allow_methods([Method::GET]),
+                .allow_origin("http://127.0.0.1:5500".parse::<HeaderValue>().unwrap())
+                .allow_headers(Any)
+                .allow_methods([Method::GET,Method::POST]),
         )
 }
 
