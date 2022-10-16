@@ -1,15 +1,14 @@
 CREATE TABLE "authorData"(
-    "id" VARCHAR(8) PRIMARY KEY NOT NULL,
+    "id" BIGSERIAL PRIMARY KEY,
     "name" VARCHAR(50) NOT NULL,
     "contact" text [] [2],
     "recent" text []
 );
 
 INSERT INTO
-    "authorData" ("id", "name", "contact", "recent")
+    "authorData" ("name", "contact", "recent")
 VALUES
     (
-        'testAuthorId',
         'testAuthorName',
         '{ { "plat1",
         "example.com/abc" },

@@ -1,5 +1,5 @@
 CREATE TABLE "thumbData"(
-    "artworkId" VARCHAR(8) NOT NULL PRIMARY KEY,
+    "artworkId" BIGSERIAL PRIMARY KEY,
     "artworkTitle" VARCHAR(50) NOT NULL,
     "authorName" VARCHAR(50) NOT NULL,
     "authorId" VARCHAR(8) NOT NULL,
@@ -10,7 +10,6 @@ CREATE TABLE "thumbData"(
 
 INSERT INTO
     "thumbData" (
-        "artworkId",
         "artworkTitle",
         "authorId",
         "authorName",
@@ -20,7 +19,6 @@ INSERT INTO
     )
 VALUES
     (
-        'testArtworkId',
         'testArtworkTitle',
         'testAuthorId',
         'testAuthorName',

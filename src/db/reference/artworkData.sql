@@ -1,20 +1,19 @@
 CREATE TABLE "artworkData"(
-    "id" VARCHAR(8) NOT NULL PRIMARY KEY,
+    "id" BIGSERIAL PRIMARY KEY,
     "title" VARCHAR(50) NOT NULL,
-    "authorId" VARCHAR(8) REFERENCES "authorData"(id),
-    "permitId" VARCHAR(8) REFERENCES "permitData"(id),
+    "authorId" BIGINT REFERENCES "authorData"(id),
+    "permitId" BIGINT REFERENCES "permitData"(id),
     "tags" text [] NOT NULL,
     "sourceOther" text [] [2] NOT NULL,
     "license" VARCHAR(10) NOT NULL,
     "timeOrigin" TIMESTAMP NOT NULL,
     "timeThis" TIMESTAMP NOT NULL,
-    "views" integer NOT NULL,
+    "views" INTEGER NOT NULL,
     "active" BOOLEAN NOT NULL
 );
 
 INSERT INTO
     "artworkData" (
-        "id",
         "title",
         "authorId",
         "permitId",
@@ -28,10 +27,9 @@ INSERT INTO
     )
 VALUES
     (
-        'testArtworkId',
         'testArtworkTitle',
-        'testAuthorId',
-        'testPermitId',
+        0,
+        0,
         '{"tag1","tag2","tag3"}',
         '{{"plat1","example.com/abc"},{"plat2","example.com/def"},{"plat3","example.com/ghi"}}',
         'CC0',
