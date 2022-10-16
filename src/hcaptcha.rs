@@ -1,10 +1,11 @@
 use std::env;
 
 use axum::body::HttpBody;
-use hyper::{client::HttpConnector, Body, Method, Request};
+use hyper::{client::HttpConnector, Body, Method, Request, Response};
 use hyper_tls::HttpsConnector;
+use redis::{aio::ConnectionManager, AsyncCommands};
 use serde::Deserialize;
-use tracing::{info, warn};
+use tracing::{info, warn, debug};
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -75,4 +76,34 @@ pub async fn verify_hcaptcha(
             Err(())
         }
     }
+}
+
+pub async fn check_hcaptcha(redis_client:&mut ConnectionManager,origin:&String)->Result<(),Response<Body>>{
+    match redis_client
+    .get::<String, String>(format!("{:#?}/hcaptcha_credit", origin))
+    // Check whether the pagesclient has completed CAPTCHA.
+    .await
+{
+    Ok(result) => {
+        debug!("Successfully verify CAPTCHA status for {}", origin);
+        if result.parse::<u32>().unwrap_or(0) <= 0 {
+            return Err(Response::builder()
+                .status(302)
+                .header("Location", "/hcaptcha")
+                .body(Body::empty())
+                .unwrap());
+        }
+        Ok(())
+    }
+    Err(e) => {
+        warn!(
+            "Failed to verify CAPTCHA status with error from redis: {}",
+            e
+        );
+        return Err(Response::builder()
+            .status(500)
+            .body(Body::from("Failed to verify your hCAPTCHA status."))
+            .unwrap());
+    }
+}
 }

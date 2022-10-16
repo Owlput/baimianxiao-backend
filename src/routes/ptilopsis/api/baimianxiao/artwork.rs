@@ -1,11 +1,11 @@
 use axum::{extract::Path, Extension};
 use hyper::{Body, Request, Response, StatusCode};
 use redis::{aio::ConnectionManager, AsyncCommands};
-use sqlx::{Pool, Postgres};
+use sqlx::{FromRow, Pool, Postgres, QueryBuilder};
 use tracing::{debug, error, info, warn};
 use url::Url;
 
-use crate::db::schemas::ArtworkData;
+use crate::{db::schemas::ArtworkData, hcaptcha::check_hcaptcha,helpers::response::*};
 
 pub async fn get_artwork(
     Path(path): Path<String>,
@@ -16,10 +16,8 @@ pub async fn get_artwork(
     let mut redis_client = match redis_client {
         Some(client) => client,
         None => {
-            return Response::builder()
-                .status(500)
-                .body(Body::from("Redis not connected"))
-                .unwrap();
+            warn!("Redis service not connected.");
+            return internal_server_error();
         }
     };
     let origin = request
@@ -27,99 +25,97 @@ pub async fn get_artwork(
         .get("x-real-ip")
         .unwrap()
         .to_str()
-        .unwrap_or("0.0.0.0");
+        .unwrap_or("0.0.0.0")
+        .to_string();
     info!("accepted request from {}", origin);
-    match redis_client
-        .get::<String, String>(format!("{:#?}/hcaptcha_credit", origin))
-        // Check whether the client has completed CAPTCHA.
-        .await
-    {
-        Ok(result) => {
-            debug!("Successfully verify CAPTCHA status for {}", origin);
-            if result.parse::<u8>().unwrap_or(0) <= 0 {
-                return Response::builder()
-                    .status(302)
-                    .header("Location", "/hcaptcha")
-                    .body(Body::empty())
-                    .unwrap();
-            }
-        }
-        Err(e) => {
-            warn!(
-                "Failed to verify CAPTCHA status with error from redis: {}",
-                e
-            );
-            return Response::builder()
-                .status(500)
-                .body(Body::from("Failed to verify your hCAPTCHA status."))
-                .unwrap();
-        }
+    match check_hcaptcha(&mut redis_client, &origin).await {
+        Ok(()) => (),
+        Err(e) => return e,
     }
-    let target_work = match Url::parse(&path).unwrap().query_pairs().next() {
-        Some(q) => {
-            if q.0 == "work" {
-                if q.1.len() != 8 {
-                    return Response::builder()
-                        .status(400)
-                        .body(Body::from("Bad Request: Illegal work ID."))
-                        .unwrap();
-                }
-                q.1.to_string()
-            } else {
-                debug!(
-                    r#"Bad request from {} on path {} : "work" is not found as the first query field "#,
-                    origin, path
-                );
-                return Response::builder()
-                    .status(400)
-                    .body(Body::from(
-                        r#"Bad request: Unable to extract field "work" from the first query."#,
-                    ))
-                    .unwrap();
-            }
-        }
-        None => {
-            debug!(
-                r#"Bad request from {} on path {} : no query field is specified, expected "work" as the first query field "#,
-                origin, path
-            );
-            return Response::builder().status(400).body(Body::from(r#"Bad request: no query field was found, expected "work" as the first query field "#)).unwrap();
-        }
+    let target_work = match helpers::get_work_id(&path, &origin) {
+        Ok(v) => v,
+        Err(e) => return e,
     };
     let mut pg_pool = match pg_pool {
         Some(pool) => pool,
         None => {
-            return Response::builder()
-                .status(500)
-                .body(Body::from("Posgresql not connected"))
-                .unwrap();
+            warn!("Posgresql not connected");
+            return internal_server_error()
         }
     };
-    let work_data = match sqlx::query_as::<_, ArtworkData>("SELECT")
-        .fetch_one(&pg_pool)
-        .await
-    {
-        Ok(data) => {
-            debug!(r#"artwork `{}` found in database "#, target_work);
-            data
-        }
+    let mut query = QueryBuilder::new("SELECT");
+    query
+        .push_bind("*")
+        .push(r#"FROM "artworkData""#)
+        .push("WITH")
+        .push_bind(format!("id = {}", target_work));
+    let query_string = query.sql().to_string();
+    let work: ArtworkData = match query.build_query_as().fetch_optional(&pg_pool).await {
+        Ok(v) => match v {
+            Some(v) => v,
+            None => {
+                debug!("Work {} not found in database.", target_work);
+                return not_found()
+            }
+        },
         Err(e) => {
             info!(
-                r#"Failed to query for artwork `{}` with error from sqlx: {}"#,
-                target_work, e
+                "Failed to perform query {} from {}: {}",
+                query_string, origin, e
             );
-            return Response::builder()
-                .status(404)
-                .body(Body::from(
-                    "Work specified was not found or is temporarily not available ",
-                ))
-                .unwrap();
+            return internal_server_error()
         }
     };
     Response::builder()
         .status(200)
-        .body(Body::from(serde_json::to_string(&work_data).unwrap()))
+        .body(Body::from(serde_json::to_string(&work).unwrap()))
         .unwrap()
 }
 
 pub async fn put_artwork() {}
+
+mod helpers {
+    use hyper::{Body, Response};
+    use tracing::{debug, info};
+    use url::Url;
+
+    pub fn get_work_id(path: &String, origin: &String) -> Result<i64, Response<Body>> {
+        match Url::parse(&path).unwrap().query_pairs().next() {
+            Some(q) => {
+                if q.0 == "work" {
+                    match q.1.parse::<i64>() {
+                        Ok(v) => return Ok(v),
+                        Err(e) => {
+                            info!(
+                                "Failed to resolve work id from {} on path {}: {}",
+                                origin, path, e
+                            );
+                            return Err(Response::builder()
+                                .status(400)
+                                .body(Body::from("Bad Request: Illegal work ID"))
+                                .unwrap());
+                        }
+                    }
+                } else {
+                    debug!(
+                        r#"Bad request from {} on path {} : "work" is not found as the first query field "#,
+                        origin, path
+                    );
+                    return Err(Response::builder()
+                        .status(400)
+                        .body(Body::from(
+                            r#"Bad request: Unable to extract field "work" from the first query."#,
+                        ))
+                        .unwrap());
+                }
+            }
+            None => {
+                debug!(
+                    r#"Bad request from {} on path {} : no query field is specified, expected "work" as the first query field "#,
+                    origin, path
+                );
+                return Err(Response::builder().status(400).body(Body::from(r#"Bad request: no query field was found, expected "work" as the first query field "#)).unwrap());
+            }
+        };
+    }
+}
