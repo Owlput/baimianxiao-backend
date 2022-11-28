@@ -1,9 +1,10 @@
 #![allow(unused)]
-pub mod access_code;
+mod access_code;
 mod db;
-pub mod hcaptcha;
-pub mod macros;
+mod hcaptcha;
+mod macros;
 mod routes;
+mod helpers;
 
 use hyper_tls::HttpsConnector;
 use routes::construct_router;
